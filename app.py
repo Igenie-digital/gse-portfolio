@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import date
 
@@ -12,6 +13,8 @@ import scraper
 import importer
 import auth
 
+PUSH_API_KEY = os.getenv("PUSH_API_KEY", "")
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -22,7 +25,9 @@ scheduler = None
 async def lifespan(app: FastAPI):
     global scheduler
     db.init_db()
-    scheduler = scraper.start_scheduler()
+    # Only start scheduler when running locally (push_prices.py handles cloud deploys)
+    if not os.getenv("RENDER"):
+        scheduler = scraper.start_scheduler()
     logger.info("App started — database initialised")
     yield
     if scheduler:
@@ -378,6 +383,47 @@ async def update_category(request: Request, ticker: str = Form(...), category: s
     with db.get_conn() as conn:
         conn.execute("UPDATE stocks SET category=? WHERE ticker=?", (category, ticker.upper()))
     return RedirectResponse("/market", status_code=303)
+
+
+# ── Price push (called from local machine in Ghana) ───────────────────────────
+
+@app.post("/api/prices/push")
+async def push_prices(request: Request):
+    """
+    Accepts price data pushed from a local script running in Ghana.
+    Body: { "api_key": "...", "prices": [{"ticker","price","change","pct"}, ...] }
+    """
+    body = await request.json()
+
+    if not PUSH_API_KEY or body.get("api_key") != PUSH_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid API key")
+
+    prices  = body.get("prices", [])
+    today   = date.today().isoformat()
+    updated = 0
+
+    known = {r["ticker"] for r in db.get_all_stocks()}
+    for item in prices:
+        ticker = str(item.get("ticker", "")).upper().strip()
+        price  = float(item.get("price", 0))
+        if not ticker or price <= 0:
+            continue
+        if ticker not in known:
+            db.ensure_stock_exists(ticker)
+        db.upsert_price(ticker, today, price,
+                        float(item.get("change", 0)),
+                        float(item.get("pct", 0)))
+        updated += 1
+
+    msg = f"Push received: {updated} prices updated for {today}"
+    db.log_scrape("ok", msg, updated)
+    logger.info(msg)
+
+    # Check price alerts against the new prices
+    price_map = {str(p.get("ticker","")).upper(): float(p.get("price",0)) for p in prices}
+    scraper._check_alerts(price_map)
+
+    return JSONResponse({"status": "ok", "updated": updated})
 
 
 if __name__ == "__main__":

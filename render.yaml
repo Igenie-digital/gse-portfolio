@@ -23,3 +23,5 @@ services:
         sync: false
       - key: SMTP_PASS
         sync: false
+      - key: PUSH_API_KEY
+        sync: false
