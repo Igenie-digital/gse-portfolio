@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # ── Config — update these two values ─────────────────────────────────────────
 APP_URL     = "https://gse-portfolio.onrender.com"   # your Render URL
-PUSH_API_KEY = "REPLACE_WITH_YOUR_KEY"               # set same key in Render env vars
+PUSH_API_KEY = "f3564faa38a9ec6a1ead755f99e6d5f45e4450bf7747792bc94e9a3d3d8cb473"               # set same key in Render env vars
 # ─────────────────────────────────────────────────────────────────────────────
 
 KWAYISI_URL = "https://dev.kwayisi.org/apis/gse/live"
