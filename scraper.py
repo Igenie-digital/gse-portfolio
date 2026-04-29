@@ -33,7 +33,7 @@ HEADERS = {
 def scrape_kwayisi() -> list[dict]:
     import requests
 
-    resp = requests.get(KWAYISI_URL, headers=HEADERS, timeout=20)
+    resp = requests.get(KWAYISI_URL, headers=HEADERS, timeout=40)
     resp.raise_for_status()
 
     data = resp.json()  # list of {name, price, change, volume}
