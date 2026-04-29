@@ -1,0 +1,107 @@
+/* ── Base (light mode) ──────────────────────────────────────────────────────── */
+html, body {
+  background-color: #f5f6fa;
+  font-size: 0.9rem;
+}
+
+.navbar-brand {
+  font-size: 1.1rem;
+  letter-spacing: 0.5px;
+}
+
+.card {
+  border: none;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+  border-radius: 10px;
+}
+
+.card-header {
+  background-color: #ffffff;
+  border-bottom: 1px solid #f0f0f0;
+  padding: 0.75rem 1rem;
+}
+
+.table th {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.badge.cat-dividend_stock  { background-color: #f0a500; color: #000; }
+.badge.cat-growth_stock    { background-color: #0d6efd; }
+.badge.cat-value_stock     { background-color: #198754; }
+.badge.cat-unclassified    { background-color: #6c757d; }
+
+.clickable-row:hover td { background-color: #fffbf0; }
+
+.fs-4 { font-size: 1.3rem !important; }
+
+#themeToggle { width: 2.2rem; height: 2.2rem; padding: 0; }
+
+/* ── Dark mode — note: data-bs-theme is ON the <html> element ────────────────
+   Selector MUST be html[data-bs-theme="dark"], not [data-bs-theme="dark"] html
+   ────────────────────────────────────────────────────────────────────────── */
+
+html[data-bs-theme="dark"],
+html[data-bs-theme="dark"] body {
+  background-color: #0f1117 !important;
+  color: #dee2e6;
+}
+
+/* Cards — all parts get the same explicit dark surface color */
+html[data-bs-theme="dark"] .card {
+  background-color: #1a1f2e !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.4) !important;
+}
+
+html[data-bs-theme="dark"] .card-header {
+  background-color: #1a1f2e !important;
+  border-bottom: 1px solid rgba(255,255,255,0.09) !important;
+  color: #dee2e6 !important;
+}
+
+html[data-bs-theme="dark"] .card-body {
+  background-color: #1a1f2e !important;
+}
+
+html[data-bs-theme="dark"] .card-footer {
+  background-color: #1a1f2e !important;
+  border-top: 1px solid rgba(255,255,255,0.09) !important;
+  color: #adb5bd !important;
+}
+
+/* Tables */
+html[data-bs-theme="dark"] .table {
+  color: #dee2e6;
+  --bs-table-bg: #1a1f2e;
+  --bs-table-striped-bg: #1e2438;
+}
+
+html[data-bs-theme="dark"] .table-dark thead {
+  background-color: #111520 !important;
+}
+
+html[data-bs-theme="dark"] .clickable-row:hover td {
+  background-color: rgba(255,255,255,0.06) !important;
+  color: #dee2e6 !important;
+}
+
+/* List groups inside cards */
+html[data-bs-theme="dark"] .list-group-item {
+  background-color: #1a1f2e !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  color: #dee2e6 !important;
+}
+
+/* Form controls */
+html[data-bs-theme="dark"] .form-select,
+html[data-bs-theme="dark"] .form-control {
+  background-color: #252b3b !important;
+  border-color: rgba(255,255,255,0.15) !important;
+  color: #dee2e6 !important;
+}
+
+/* Navbar stays dark regardless */
+.navbar { background-color: #111520 !important; }

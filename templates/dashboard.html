@@ -1,0 +1,448 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — GSE Portfolio{% endblock %}
+
+{% block content %}
+
+<!-- ── Row 1: Summary Cards ──────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card bg-dark text-white h-100">
+      <div class="card-body">
+        <div class="text-white-50 small">Total Cost</div>
+        <div class="fs-4 fw-bold">{{ summary.total_cost | ghs }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card bg-dark text-white h-100">
+      <div class="card-body">
+        <div class="text-white-50 small">Current Value</div>
+        <div class="fs-4 fw-bold">{{ summary.total_value | ghs }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card {% if summary.total_gl >= 0 %}bg-success{% else %}bg-danger{% endif %} text-white h-100">
+      <div class="card-body">
+        <div class="text-white-50 small">Gain / Loss</div>
+        <div class="fs-4 fw-bold">{{ summary.total_gl | sign }} GHS</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card {% if summary.roi >= 0 %}bg-success{% else %}bg-danger{% endif %} text-white h-100">
+      <div class="card-body">
+        <div class="text-white-50 small">Overall ROI</div>
+        <div class="fs-4 fw-bold">{{ summary.roi | sign_pct }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Row 2: Portfolio Charts ───────────────────────────────────────────── -->
+<div class="row g-4 mb-4">
+  <!-- Pie: % allocation by ticker -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header fw-semibold"><i class="bi bi-pie-chart-fill me-1 text-primary"></i>Portfolio Allocation by Current Value</div>
+      <div class="card-body p-2" style="position:relative; height:260px;">
+        <canvas id="allocChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- Bar: Total Cost vs Market Value per ticker -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header fw-semibold"><i class="bi bi-bar-chart-fill me-1 text-info"></i>Cost vs Market Value by Ticker</div>
+      <div class="card-body p-2" style="position:relative; height:260px;">
+        <canvas id="costValueChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Row 3: Holdings + Right Column ───────────────────────────────────── -->
+<div class="row g-4">
+
+  <!-- Holdings Table -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-briefcase me-1"></i>Holdings</span>
+        {% if last_scrape %}
+        <small class="text-muted">Prices as of {{ last_scrape.ran_at[:10] }}</small>
+        {% endif %}
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0 align-middle" style="font-size:0.82rem">
+          <thead class="table-dark">
+            <tr>
+              <th>Ticker</th>
+              <th>Category</th>
+              <th class="text-end">Shares</th>
+              <th class="text-end">Avg Cost</th>
+              <th class="text-end">Total Cost</th>
+              <th class="text-end">Current Price</th>
+              <th class="text-end">Market Value</th>
+              <th class="text-end">G/L</th>
+              <th class="text-end">ROI</th>
+              <th class="text-end">Wt%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for h in portfolio %}
+            <tr class="clickable-row" data-ticker="{{ h.ticker }}" style="cursor:pointer" title="Click for price chart">
+              <td><span class="fw-bold">{{ h.ticker }}</span><br><small class="text-muted">{{ h.name }}</small></td>
+              <td><span class="badge cat-{{ h.category | lower | replace(' ','_') }}">{{ h.category }}</span></td>
+              <td class="text-end">{{ h.shares }}</td>
+              <td class="text-end">{{ h.avg_cost }}</td>
+              <td class="text-end">{{ h.total_cost | ghs }}</td>
+              <td class="text-end fw-semibold">{{ h.current_price }}</td>
+              <td class="text-end">{{ h.market_value | ghs }}</td>
+              <td class="text-end {% if h.gain_loss >= 0 %}text-success{% else %}text-danger{% endif %}">
+                {{ h.gain_loss | sign }}
+              </td>
+              <td class="text-end {% if h.gain_loss_pct >= 0 %}text-success{% else %}text-danger{% endif %}">
+                {{ h.gain_loss_pct | sign_pct }}
+              </td>
+              <td class="text-end">{{ h.weight }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Price History Chart -->
+    <div class="card mt-3">
+      <div class="card-header d-flex flex-wrap align-items-center gap-2">
+        <i class="bi bi-graph-up-arrow me-1 text-warning"></i>
+        <span class="fw-semibold me-2">Price History</span>
+
+        <select id="histTicker" class="form-select form-select-sm w-auto">
+          {% for h in portfolio %}
+          <option value="{{ h.ticker }}">{{ h.ticker }} — {{ h.name }}</option>
+          {% endfor %}
+        </select>
+
+        <div class="btn-group btn-group-sm ms-auto" id="durationBtns">
+          <button class="btn btn-outline-secondary" data-days="7">7D</button>
+          <button class="btn btn-outline-secondary" data-days="30">30D</button>
+          <button class="btn btn-outline-secondary" data-days="60">60D</button>
+          <button class="btn btn-outline-secondary active" data-days="90">90D</button>
+          <button class="btn btn-outline-secondary" data-days="180">180D</button>
+          <button class="btn btn-outline-secondary" data-days="360">360D</button>
+        </div>
+      </div>
+
+      <div class="card-body p-2" style="position:relative; height:300px;">
+        <canvas id="histChart"></canvas>
+        <div id="histNoData" class="d-none position-absolute top-50 start-50 translate-middle text-muted small">
+          No price history yet for this stock — prices accumulate daily after each refresh.
+        </div>
+      </div>
+
+      <div class="card-footer text-muted small py-1" id="histFooter"></div>
+    </div>
+  </div>
+
+  <!-- Right Column -->
+  <div class="col-lg-4">
+
+    <!-- Top Performers -->
+    <div class="card mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-trophy me-1 text-warning"></i>Top Performers by ROI</div>
+      <ul class="list-group list-group-flush">
+        {% for h in top_performers %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span class="fw-semibold">{{ h.ticker }}</span>
+          <span class="badge {% if h.gain_loss_pct >= 0 %}bg-success{% else %}bg-danger{% endif %} rounded-pill">
+            {{ h.gain_loss_pct | sign_pct }}
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- Category Breakdown -->
+    <div class="card mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-pie-chart me-1"></i>Stock Category</div>
+      <div class="card-body p-2" style="position:relative; height:180px;">
+        <canvas id="catChart"></canvas>
+      </div>
+      <ul class="list-group list-group-flush">
+        {% for cat, c in summary.categories.items() %}
+        <li class="list-group-item d-flex justify-content-between small">
+          <span>{{ cat }} <span class="text-muted">({{ c.count }})</span></span>
+          <span class="{% if c.gl_pct >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ c.gl_pct | sign_pct }} &mdash; {{ c.weight }}%
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- Category Assignment — all stocks -->
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-tag me-1 text-secondary"></i>Assign / Change Category
+        {% if unclassified_count %}
+        <span class="badge bg-warning text-dark ms-1">{{ unclassified_count }} unclassified</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <form method="post" action="/stocks/category">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Stock</label>
+            <select name="ticker" class="form-select form-select-sm">
+              {% for s in all_stocks %}
+              <option value="{{ s.ticker }}">{{ s.ticker }} — {{ s.name }}
+                {%- if s.category != 'Unclassified' %} ({{ s.category }}){% endif -%}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Category</label>
+            <select name="category" class="form-select form-select-sm">
+              <option value="Dividend Stock">Dividend Stock</option>
+              <option value="Growth Stock">Growth Stock</option>
+              <option value="Value Stock">Value Stock</option>
+              <option value="Unclassified">Unclassified</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-secondary btn-sm w-100">
+            <i class="bi bi-check2 me-1"></i>Save Category
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Quick Add Trade -->
+    <div class="card">
+      <div class="card-header fw-semibold"><i class="bi bi-plus-circle me-1 text-success"></i>Add Trade</div>
+      <div class="card-body">
+        <a href="/trades" class="btn btn-success w-100">
+          <i class="bi bi-journal-plus me-1"></i>Go to Trade Log
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Apply Chart.js theme colours before any chart is created
+applyChartDefaults();
+
+// ── Shared palette ────────────────────────────────────────────────────────────
+const PALETTE = [
+  "#4361ee","#f0a500","#198754","#dc3545","#0dcaf0",
+  "#6f42c1","#fd7e14","#20c997","#e83e8c","#adb5bd",
+  "#0d6efd","#ffc107","#d63384","#6610f2","#17a2b8"
+];
+
+// ── Portfolio data from server (sorted biggest → smallest by market value) ────
+const holdingsRaw = [
+  {% for h in portfolio %}
+  { ticker:"{{ h.ticker }}", cost:{{ h.total_cost }}, value:{{ h.market_value }}, gl:{{ h.gain_loss }} },
+  {% endfor %}
+];
+holdingsRaw.sort((a, b) => b.value - a.value);
+const tickers = holdingsRaw.map(h => h.ticker);
+const costs   = holdingsRaw.map(h => h.cost);
+const values  = holdingsRaw.map(h => h.value);
+const colors  = holdingsRaw.map((_, i) => PALETTE[i % PALETTE.length]);
+
+// ── 1. Allocation pie — sorted, % labels on slices ────────────────────────────
+Chart.register(ChartDataLabels);
+new Chart(document.getElementById("allocChart"), {
+  type: "pie",
+  data: {
+    labels: tickers,
+    datasets: [{ data: values, backgroundColor: colors, borderWidth: 2 }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "right", labels: { boxWidth: 12, font: { size: 11 } } },
+      tooltip: {
+        callbacks: {
+          label: ctx => {
+            const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+            const pct = (ctx.parsed / total * 100).toFixed(1);
+            return ` GHS ${ctx.parsed.toFixed(2)} (${pct}%)`;
+          }
+        }
+      },
+      datalabels: {
+        color: "#fff",
+        font: { weight: "bold", size: 11 },
+        formatter: (val, ctx) => {
+          const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+          const pct = (val / total * 100).toFixed(1);
+          return pct >= 4 ? pct + "%" : "";   // hide label if slice too small
+        }
+      }
+    }
+  }
+});
+
+// ── 2. Cost vs Market Value grouped bar chart ─────────────────────────────────
+new Chart(document.getElementById("costValueChart"), {
+  type: "bar",
+  data: {
+    labels: tickers,
+    datasets: [
+      { label: "Total Cost",    data: costs,  backgroundColor: "#6c757d", borderRadius: 4 },
+      { label: "Market Value",  data: values, backgroundColor: holdingsRaw.map(h => h.gl >= 0 ? "#198754" : "#dc3545"), borderRadius: 4 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "top" },
+      tooltip: { callbacks: { label: ctx => ` GHS ${ctx.parsed.y.toFixed(2)}` } },
+      datalabels: { display: false }
+    },
+    scales: {
+      x: { ticks: { font: { size: 11 } } },
+      y: { ticks: { callback: v => "GHS " + v.toLocaleString() } }
+    }
+  }
+});
+
+// ── 3. Category donut — sorted biggest → smallest, % labels ──────────────────
+const catRaw = [
+  {% for cat, c in summary.categories.items() %}
+  { label: "{{ cat }}", value: {{ c.cost }} },
+  {% endfor %}
+];
+catRaw.sort((a, b) => b.value - a.value);
+new Chart(document.getElementById("catChart"), {
+  type: "doughnut",
+  data: {
+    labels: catRaw.map(c => c.label),
+    datasets: [{
+      data: catRaw.map(c => c.value),
+      backgroundColor: ["#f0a500","#198754","#0d6efd","#6c757d"],
+      borderWidth: 2,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: "60%",
+    plugins: {
+      legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } },
+      datalabels: {
+        color: "#fff",
+        font: { weight: "bold", size: 10 },
+        formatter: (val, ctx) => {
+          const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+          const pct = (val / total * 100).toFixed(1);
+          return pct >= 5 ? pct + "%" : "";
+        }
+      }
+    }
+  }
+});
+
+// ── 4. Price History Chart ────────────────────────────────────────────────────
+let histChart = null;
+let activeDays = 90;
+
+async function loadHistChart() {
+  const ticker = document.getElementById("histTicker").value;
+  const res    = await fetch(`/api/price-history/${ticker}?days=${activeDays}`);
+  const data   = await res.json();
+
+  const noData = document.getElementById("histNoData");
+  const footer = document.getElementById("histFooter");
+
+  if (!data.labels || data.labels.length === 0) {
+    noData.classList.remove("d-none");
+    footer.textContent = "";
+    if (histChart) { histChart.destroy(); histChart = null; }
+    return;
+  }
+  noData.classList.add("d-none");
+
+  // Price change over period
+  const first = data.prices[0], last = data.prices[data.prices.length - 1];
+  const chg = last - first, chgPct = first ? (chg / first * 100) : 0;
+  const sign = chg >= 0 ? "▲" : "▼";
+  footer.innerHTML = `<span class="${chg >= 0 ? "text-success" : "text-danger"}">
+    ${ticker}: ${sign} GHS ${Math.abs(chg).toFixed(4)} (${sign} ${Math.abs(chgPct).toFixed(2)}%) over ${data.labels.length} trading day(s)
+  </span>`;
+
+  if (histChart) histChart.destroy();
+  histChart = new Chart(document.getElementById("histChart"), {
+    type: "line",
+    data: {
+      labels: data.labels,
+      datasets: [{
+        label: `${ticker} (GHS)`,
+        data: data.prices,
+        borderColor: chg >= 0 ? "#198754" : "#dc3545",
+        backgroundColor: chg >= 0 ? "rgba(25,135,84,0.08)" : "rgba(220,53,69,0.08)",
+        tension: 0.3,
+        fill: true,
+        pointRadius: data.labels.length <= 30 ? 3 : 1,
+        pointHoverRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        datalabels: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` GHS ${ctx.parsed.y.toFixed(4)}`
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 12, font: { size: 10 } } },
+        y: { ticks: { callback: v => "GHS " + v } }
+      }
+    }
+  });
+}
+
+// Duration button clicks
+document.querySelectorAll("#durationBtns .btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#durationBtns .btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeDays = parseInt(btn.dataset.days);
+    loadHistChart();
+  });
+});
+
+// Ticker dropdown change
+document.getElementById("histTicker").addEventListener("change", loadHistChart);
+
+// Row click → jump to that ticker in the chart
+document.querySelectorAll(".clickable-row").forEach(row => {
+  row.addEventListener("click", () => {
+    const sel = document.getElementById("histTicker");
+    sel.value = row.dataset.ticker;
+    if (sel.value === row.dataset.ticker) {   // only scroll if ticker exists in portfolio
+      loadHistChart();
+      document.getElementById("histChart").closest(".card").scrollIntoView({ behavior: "smooth" });
+    }
+  });
+});
+
+// Load on page init
+loadHistChart();
+</script>
+{% endblock %}

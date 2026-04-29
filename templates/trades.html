@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+{% block title %}Trade Log — GSE Portfolio{% endblock %}
+
+{% block content %}
+
+{% if imported %}
+<div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+  <i class="bi bi-check-circle-fill me-2"></i>
+  <strong>{{ imported }} trade(s) imported successfully.</strong>
+  {% if skipped %} {{ skipped }} row(s) were skipped — check that they had valid dates, tickers and prices.{% endif %}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- ── Import from File ───────────────────────────────────────────────────── -->
+<div class="card mb-4">
+  <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-file-earmark-arrow-up me-1 text-primary"></i>Import Trades from File</span>
+    <button class="btn btn-sm btn-outline-secondary" type="button"
+            data-bs-toggle="collapse" data-bs-target="#importPanel">
+      <i class="bi bi-chevron-down"></i>
+    </button>
+  </div>
+  <div class="collapse" id="importPanel">
+    <div class="card-body">
+      <p class="text-muted small mb-3">
+        Upload a <strong>CSV</strong> or <strong>Excel (.xlsx)</strong> file containing your past trades.
+        After uploading you will map the file's columns to the required trade fields before importing.
+      </p>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-7">
+          <label class="form-label fw-semibold small">Select file</label>
+          <input type="file" id="importFile" class="form-control"
+                 accept=".csv,.xlsx,.xls" required>
+          <div class="form-text">Supported: CSV, Excel (.xlsx / .xls) — exported Google Sheets work too.</div>
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-primary w-100" id="uploadBtn" onclick="handleUpload()">
+            <i class="bi bi-upload me-1"></i>Upload &amp; Map Fields
+          </button>
+        </div>
+      </div>
+      <div id="uploadError" class="alert alert-danger mt-3 d-none small"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main Row ───────────────────────────────────────────────────────────── -->
+<div class="row g-4">
+
+  <!-- Add Trade Form -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header fw-semibold"><i class="bi bi-plus-circle text-success me-1"></i>Add Single Trade</div>
+      <div class="card-body">
+        <form method="post" action="/trades/add">
+
+          <div class="mb-3">
+            <label class="form-label">Order Date</label>
+            <input type="date" name="order_date" class="form-control" value="{{ today }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Ticker</label>
+            <select name="ticker" class="form-select" required>
+              <option value="">— Select stock —</option>
+              {% for s in stocks %}
+              <option value="{{ s.ticker }}">{{ s.ticker }} — {{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Broker</label>
+            <select name="broker" class="form-select">
+              <option value="Blackstar">Blackstar</option>
+              <option value="IC Wealth">IC Wealth</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Executed Price (GHS)</label>
+            <input type="number" name="price" step="0.0001" class="form-control"
+                   placeholder="e.g. 5.58" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Units (shares)</label>
+            <input type="number" name="units" step="0.0001" class="form-control"
+                   placeholder="e.g. 100" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Total Amount Paid (GHS)</label>
+            <input type="number" name="amount" step="0.01" class="form-control"
+                   placeholder="e.g. 570.00 (incl. broker charges)">
+            <div class="form-text">Include all broker charges.</div>
+          </div>
+
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-check-lg me-1"></i>Add Trade
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trade History -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-journal-text me-1"></i>Trade History
+        <span class="badge bg-secondary ms-2">{{ trades | length }} orders</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0 align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th>Date</th>
+              <th>Ticker</th>
+              <th>Name</th>
+              <th class="text-end">Units</th>
+              <th class="text-end">Price</th>
+              <th class="text-end">Amount</th>
+              <th>Broker</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in trades %}
+            <tr>
+              <td>{{ t.order_date }}</td>
+              <td class="fw-bold">{{ t.ticker }}</td>
+              <td>{{ t.name }}</td>
+              <td class="text-end">{{ "%.2f" | format(t.units) }}</td>
+              <td class="text-end">{{ t.price }}</td>
+              <td class="text-end">{{ t.amount | ghs }}</td>
+              <td><span class="badge bg-secondary">{{ t.broker }}</span></td>
+              <td>
+                <form method="post" action="/trades/delete/{{ t.id }}"
+                      onsubmit="return confirm('Delete this trade?')">
+                  <button class="btn btn-outline-danger btn-sm py-0 px-1">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     Field Mapping Modal
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="mappingModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title mb-0"><i class="bi bi-diagram-3 me-2 text-primary"></i>Map File Columns to Trade Fields</h5>
+          <small class="text-muted" id="fileInfo"></small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <form method="post" action="/trades/import" id="importForm">
+        <input type="hidden" name="upload_id" id="uploadIdField">
+
+        <div class="modal-body">
+
+          <!-- Mapping Table -->
+          <div class="card mb-4">
+            <div class="card-header fw-semibold small">
+              <i class="bi bi-arrow-left-right me-1"></i>Column Mapping
+              <span class="text-muted ms-2">Match each trade field to the column in your file</span>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-dark">
+                  <tr>
+                    <th style="width:35%">Trade Field</th>
+                    <th style="width:45%">Your File Column</th>
+                    <th style="width:20%">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="mappingBody">
+                  <!-- Rows injected by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Data Preview -->
+          <div class="card">
+            <div class="card-header fw-semibold small d-flex justify-content-between">
+              <span><i class="bi bi-eye me-1"></i>Data Preview <span class="text-muted">(first 5 rows with your mapping)</span></span>
+              <span id="previewCount" class="text-muted small"></span>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm mb-0" style="font-size:0.8rem">
+                <thead class="table-secondary">
+                  <tr>
+                    <th>Date</th>
+                    <th>Ticker</th>
+                    <th>Units</th>
+                    <th>Price</th>
+                    <th>Amount</th>
+                    <th>Broker</th>
+                  </tr>
+                </thead>
+                <tbody id="previewBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div><!-- /modal-body -->
+
+        <div class="modal-footer d-flex justify-content-between align-items-center">
+          <small class="text-muted">
+            <i class="bi bi-info-circle me-1"></i>
+            Required: <strong>Date</strong>, <strong>Ticker</strong>, <strong>Price</strong>,
+            and at least one of <strong>Units</strong> or <strong>Amount</strong>.
+          </small>
+          <div>
+            <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="importBtn">
+              <i class="bi bi-cloud-download me-1"></i>Import Trades
+            </button>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Field definitions ─────────────────────────────────────────────────────────
+const FIELDS = [
+  { key: "order_date", label: "Order Date",        required: true,  hint: "The date the trade was executed" },
+  { key: "ticker",     label: "Ticker / Symbol",   required: true,  hint: "Stock ticker e.g. MTNGH, GCB" },
+  { key: "units",      label: "Units (Shares)",     required: false, hint: "Number of shares purchased" },
+  { key: "price",      label: "Executed Price",     required: true,  hint: "Price per share in GHS" },
+  { key: "amount",     label: "Total Amount Paid",  required: false, hint: "Total paid including broker fees" },
+  { key: "broker",     label: "Broker",             required: false, hint: "e.g. Blackstar, IC Wealth" },
+];
+
+// Auto-match keywords for each field
+const AUTO_KEYWORDS = {
+  order_date: ["date", "order date", "trade date", "order_date", "traddate"],
+  ticker:     ["ticker", "symbol", "stock", "code", "scrip"],
+  units:      ["units", "shares", "quantity", "qty", "volume"],
+  price:      ["price", "executed price", "exec price", "rate", "unit price"],
+  amount:     ["amount", "total", "value", "executed amount", "consideration", "gross"],
+  broker:     ["broker", "agent", "platform", "dealer"],
+};
+
+let _uploadData = null;   // { upload_id, columns, preview, total_rows }
+
+// ── Upload handler ────────────────────────────────────────────────────────────
+async function handleUpload() {
+  const fileInput = document.getElementById("importFile");
+  if (!fileInput.files.length) {
+    showUploadError("Please select a file first.");
+    return;
+  }
+
+  const btn = document.getElementById("uploadBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Parsing…';
+  document.getElementById("uploadError").classList.add("d-none");
+
+  try {
+    const fd = new FormData();
+    fd.append("file", fileInput.files[0]);
+    const res  = await fetch("/trades/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.error) { showUploadError(data.error); return; }
+    _uploadData = data;
+    openMappingModal(data);
+  } catch(e) {
+    showUploadError("Upload failed: " + e);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-upload me-1"></i>Upload &amp; Map Fields';
+  }
+}
+
+function showUploadError(msg) {
+  const el = document.getElementById("uploadError");
+  el.textContent = msg;
+  el.classList.remove("d-none");
+}
+
+// ── Build & open the mapping modal ────────────────────────────────────────────
+function openMappingModal(data) {
+  document.getElementById("uploadIdField").value = data.upload_id;
+  document.getElementById("fileInfo").textContent =
+    `${data.filename}  —  ${data.total_rows} data row(s) detected`;
+  document.getElementById("previewCount").textContent =
+    `showing ${Math.min(5, data.total_rows)} of ${data.total_rows} rows`;
+
+  buildMappingRows(data.columns);
+  updatePreview();
+  new bootstrap.Modal(document.getElementById("mappingModal")).show();
+}
+
+function buildMappingRows(columns) {
+  const body = document.getElementById("mappingBody");
+  body.innerHTML = "";
+
+  FIELDS.forEach(field => {
+    const autoCol = autoMatch(field.key, columns);
+    const optionsHtml = `<option value="">— skip —</option>` +
+      columns.map(c =>
+        `<option value="${esc(c)}" ${c === autoCol ? "selected" : ""}>${esc(c)}</option>`
+      ).join("");
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+        <div class="fw-semibold small">${field.label}
+          ${field.required ? '<span class="text-danger ms-1">*</span>' : ""}
+        </div>
+        <div class="text-muted" style="font-size:0.75rem">${field.hint}</div>
+      </td>
+      <td>
+        <select name="map_${field.key}" id="map_${field.key}"
+                class="form-select form-select-sm" onchange="updatePreview()">
+          ${optionsHtml}
+        </select>
+      </td>
+      <td id="status_${field.key}"></td>`;
+    body.appendChild(tr);
+
+    updateFieldStatus(field.key, autoCol);
+  });
+}
+
+function autoMatch(fieldKey, columns) {
+  const keywords = AUTO_KEYWORDS[fieldKey] || [];
+  return columns.find(col =>
+    keywords.some(kw => col.toLowerCase().includes(kw))
+  ) || "";
+}
+
+function updateFieldStatus(fieldKey, selectedCol) {
+  const cell = document.getElementById(`status_${fieldKey}`);
+  if (!cell) return;
+  if (selectedCol) {
+    cell.innerHTML = `<span class="badge bg-success">Mapped</span>`;
+  } else {
+    const field = FIELDS.find(f => f.key === fieldKey);
+    cell.innerHTML = field && field.required
+      ? `<span class="badge bg-danger">Required</span>`
+      : `<span class="badge bg-secondary">Optional</span>`;
+  }
+}
+
+// ── Live preview ──────────────────────────────────────────────────────────────
+function updatePreview() {
+  if (!_uploadData) return;
+
+  // Update status badges
+  FIELDS.forEach(f => {
+    const sel = document.getElementById(`map_${f.key}`);
+    if (sel) updateFieldStatus(f.key, sel.value);
+  });
+
+  const colIdx = {};
+  _uploadData.columns.forEach((c, i) => { colIdx[c] = i; });
+
+  function getCell(row, fieldKey) {
+    const sel = document.getElementById(`map_${fieldKey}`);
+    const col = sel ? sel.value : "";
+    if (!col) return "";
+    const idx = colIdx[col];
+    return (idx !== undefined && idx < row.length) ? row[idx] : "";
+  }
+
+  const tbody = document.getElementById("previewBody");
+  tbody.innerHTML = "";
+
+  _uploadData.preview.forEach(row => {
+    const tr = document.createElement("tr");
+    FIELDS.forEach(f => {
+      const td = document.createElement("td");
+      const val = getCell(row, f.key);
+      td.textContent = val || "—";
+      if (!val) td.className = "text-muted";
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+}
+</script>
+{% endblock %}

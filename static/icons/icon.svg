@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="90" fill="#111520"/>
+  <!-- Bar chart -->
+  <rect x="72"  y="310" width="90" height="142" rx="10" fill="#ffc107"/>
+  <rect x="196" y="220" width="90" height="232" rx="10" fill="#ffc107"/>
+  <rect x="320" y="150" width="90" height="302" rx="10" fill="#ffc107"/>
+  <!-- Trend line -->
+  <polyline points="117,290 241,200 365,132"
+            stroke="#4ade80" stroke-width="18" fill="none"
+            stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Dots -->
+  <circle cx="117" cy="290" r="14" fill="#4ade80"/>
+  <circle cx="241" cy="200" r="14" fill="#4ade80"/>
+  <circle cx="365" cy="132" r="14" fill="#4ade80"/>
+  <!-- GSE label -->
+  <text x="256" y="490" font-family="Arial,sans-serif" font-size="52"
+        font-weight="700" fill="#ffc107" text-anchor="middle" letter-spacing="4">GSE</text>
+</svg>

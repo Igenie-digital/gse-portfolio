@@ -1,0 +1,36 @@
+{
+  "name": "GSE Portfolio Tracker",
+  "short_name": "GSE Portfolio",
+  "description": "Track your Ghana Stock Exchange investments",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#111520",
+  "theme_color": "#111520",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "/static/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/",
+      "icons": [{ "src": "/static/icons/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Trade Log",
+      "url": "/trades",
+      "icons": [{ "src": "/static/icons/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Market Board",
+      "url": "/market",
+      "icons": [{ "src": "/static/icons/icon.svg", "sizes": "any" }]
+    }
+  ]
+}
